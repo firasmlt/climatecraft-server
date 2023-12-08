@@ -22,8 +22,7 @@ class AuthController {
                 })
             }
 
-            const { firstName, lastName, email, password } =
-                req.body
+            const { firstName, lastName, email, password } = req.body
 
             const user = new userSchema({
                 firstName,
@@ -31,7 +30,9 @@ class AuthController {
                 email: email.toLowerCase(),
                 password,
                 createdAt: new Date(Date.now()),
+                updatedAt: new Date(Date.now()),
             })
+
             user.password = await bcrypt.hash(password, 10)
             await user.save()
             const token = user.generateAuthToken()
@@ -59,7 +60,6 @@ class AuthController {
             })
         }
     }
-
 
     static login = async (req: Request, res: Response) => {
         try {
