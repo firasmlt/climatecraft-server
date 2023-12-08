@@ -4,6 +4,7 @@ import { ValidationError, ValidationResult } from "../types/validation"
 import CraftType from "../types/craft"
 import CraftSchema from "../models/CraftSchema"
 import { isValidObjectId } from "mongoose"
+import path from "path"
 
 class CraftController {
     static createCraft = async (req: Request, res: Response) => {
@@ -34,9 +35,9 @@ class CraftController {
 
 
             const newCraft = new CraftSchema<CraftType>({
-                title: !title ? "Untitled Flow" : title,
+                title: !title ? "Untitled Craft" : title,
                 description: !description ? "no description." : description,
-                
+
                 photoUrl,
                 createdAt: new Date(Date.now()),
                 updatedAt: new Date(Date.now()),
@@ -275,15 +276,7 @@ class CraftController {
                 })
             }
 
-            if (craft.userId !== req.currentUser.id) {
-                return res.status(401).json({
-                    status: "error",
-                    message: "unauthorized",
-                    data: null,
-                })
-            }
-
-            const formattedFlow = {
+            const formattedCraft = {
                 id: craft._id,
                 title: craft.title,
                 description: craft.description,
@@ -296,7 +289,7 @@ class CraftController {
             res.status(200).json({
                 status: "success",
                 message: "craft fetched successfully",
-                data: formattedFlow,
+                data: formattedCraft,
             })
         } catch (err: any) {
             if (err?.keyValue) {
@@ -376,6 +369,124 @@ class CraftController {
             })
         }
     }
+
+    static getAllCrafts = async (req: Request, res: Response) => {
+        try {
+            const validationResults = validationResult(
+                req
+            ) as unknown as ValidationResult
+            console.log(validationResults)
+            const errors: ValidationError[] =
+                (validationResults?.errors as ValidationError[]) || []
+            if (errors.length > 0) {
+                return res.status(400).json({
+                    status: "error",
+                    message: `invalid ${errors[0]?.path} : ${errors[0]?.value}`,
+                    data: null,
+                })
+            }
+
+            if (!req.currentUser) {
+                return res.status(401).json({
+                    status: "error",
+                    message: "unauthorized",
+                    data: null,
+                })
+            }
+
+            const PAGE_SIZE = 10; // Adjust this based on your requirements
+            const pageNumber = (req.query.page as string) || '1';
+            const parsedPageNumber = parseInt(pageNumber, 10);
+
+            const crafts = await CraftSchema.find()
+                .skip((parsedPageNumber - 1) * PAGE_SIZE)
+                .limit(PAGE_SIZE);
+
+            const totalCrafts = await CraftSchema.countDocuments();
+            const totalPages = Math.ceil(totalCrafts / PAGE_SIZE);
+
+            const formattedCrafts = crafts.map((craft: CraftType) => {
+                return {
+                    id: craft._id,
+                    title: craft.title,
+                    description: craft.description,
+                    photoUrl: craft.photoUrl,
+                    userId: craft.userId,
+                    createdAt: craft.createdAt,
+                    updatedAt: craft.updatedAt,
+                }
+            })
+
+            res.status(200).json({
+                status: "success",
+                message: "crafts fetched successfully",
+                data: {
+                    crafts: formattedCrafts,
+                    totalPages: totalPages,
+                },
+            })
+        } catch (err: any) {
+            if (err?.keyValue) {
+                return res.status(400).json({
+                    status: "error",
+                    message: `${Object.keys(err.keyValue)[0]} already in use`,
+                    data: null,
+                })
+            }
+            console.log("errr", err)
+            res.status(500).json({
+                status: "error",
+                message: "internal server error",
+                data: null,
+            })
+        }
+    }
+
+    // static uploadCraftPhoto = async (req: Request, res: Response) => {
+    //     try {
+    //         const file = req.files?.craftPhoto;
+    //         if (!file) {
+    //             return res
+    //                 .status(400)
+    //                 .json({ status: "error", message: "no file selected!" });
+    //         }
+    //         //@ts-ignore
+    //         const extention = path.parse(file?.name).ext;
+    //         //@ts-ignore
+
+    //         if (!file.mimetype.startsWith("image")) {
+    //             return res.status(400).json({
+    //                 status: "error",
+    //                 message: "invalid file type",
+    //             });
+    //         }
+    //         //@ts-ignore
+
+    //         if (file.size > 10 * 1024 * 1024) {
+    //             return res.status(400).json({
+    //                 status: "error",
+    //                 message: "file size exceeds the maximum limit of 10MB",
+    //             });
+    //         }
+
+    //         const filename = await MediaController.saveFile(file, "campaign");
+
+    //         return res.status(200).json({
+    //             status: "success",
+    //             message: "photo uploaded",
+    //             data: {
+    //                 photoPath: `${process.env.DOMAIN_SERVER}/v1/uploads/${filename}${extention}`,
+    //             },
+    //         });
+    //     } catch (err: any) {
+    //         console.log(err);
+
+    //         return res.status(500).json({
+    //             status: "error",
+    //             message: "internal server error",
+    //         });
+    //     }
+    // };
 }
 
 export default CraftController
